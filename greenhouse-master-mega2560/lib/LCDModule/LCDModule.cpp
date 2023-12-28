@@ -42,8 +42,8 @@ void writeDateToLCD()
 
 void writeDHTReadingsToLCD()
 {
-    double temperature = getTemperature();
-    double humidity = getHumidity();
+    float temperature = getTemperature();
+    float humidity = getHumidity();
 
     char buffer[10];
 
@@ -51,7 +51,12 @@ void writeDHTReadingsToLCD()
     {
         sprintf(buffer, "DHT-ERROR");
     } else {
-        sprintf(buffer, "%.2f°C-%.2f%% ", temperature, humidity);
+        char temperatureBuffer[5];
+        char humidityBuffer[5];
+
+        dtostrf(temperature, 5, 1, temperatureBuffer);
+        dtostrf(humidity, 5, 1, humidityBuffer);
+        sprintf(buffer, "%s°C-%s%% ", temperatureBuffer, humidityBuffer);
     }
     
     lcd.setCursor(1, 0);

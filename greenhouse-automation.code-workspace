@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "greenhouse-master-esp8266"
+		},
+		{
+			"name": "greenhouse-master-mega2560",
+			"path": "greenhouse-master-mega2560"
+		},
+		{
+			"name": "greenhouse-slave-uno",
+			"path": "greenhouse-slave-uno"
+		}
+	],
+	"settings": {}
+}

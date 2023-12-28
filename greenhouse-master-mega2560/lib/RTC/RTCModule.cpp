@@ -4,9 +4,9 @@ RTC_DS3231 rtc;
 
 void initializeRTC()
 {
-    Serial.println("Initializing RTC...");
+    // Serial.println("Initializing RTC...");
     if(!rtc.begin()) {
-        Serial.println("Couldn't find RTC!");
+        // Serial.println("Couldn't find RTC!");
     }
 
     if(rtc.lostPower()) {
@@ -18,7 +18,7 @@ void initializeRTC()
     rtc.disableAlarm(1);
     rtc.disableAlarm(2);
 
-    Serial.print("Initialized RTC!");
+    // Serial.print("Initialized RTC!");
 }
 
 DateTime getCurrentDateTime()
