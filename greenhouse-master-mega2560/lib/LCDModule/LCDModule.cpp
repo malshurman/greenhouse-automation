@@ -1,43 +1,44 @@
-#include <LCDModule.h>
-#include <SPI.h>
-#include <Wire.h> 
 #include <LiquidCrystal_I2C.h>
 #include <DHTModule.h>
 #include <RTCModule.h>
-#include <Ticker.h>
+#include <Buttons.h>
+#include <Pump.h>
 
 LiquidCrystal_I2C lcd(0x27,20,4);
 
-void writeDateToLCD();
-void writeDHTReadingsToLCD();
+char dateTimeBuffer[20];
+char tempBuffer[10];
+char humBuffer[10];
+char pumpBuffer[20];
 
-Ticker updateDateTicker(writeDateToLCD, 1000, 0, MILLIS);
-Ticker updateDHTReadingsTicker(writeDHTReadingsToLCD, 20000, 0, MILLIS);
+byte degreeSymbol[8] = {
+  0b00110,
+  0b01001,
+  0b01001,
+  0b00110,
+  0b00000,
+  0b00000,
+  0b00000,
+  0b00000
+};
 
 void initializeLCD()
 {
     lcd.init();
     lcd.backlight();
-    updateDateTicker.start();
-    updateDHTReadingsTicker.start();
+    lcd.clear();
+
+    lcd.createChar(0, degreeSymbol);
 }
 
-void updateLCD()
-{
-    updateDateTicker.update();
-    updateDHTReadingsTicker.update();
-}
-
-void writeDateToLCD()
+void writeDateAndTimeToLCD()
 {
     DateTime date = getCurrentDateTime();
 
-    char buffer[20];
-
-    sprintf(buffer,"%02u-%02u-%04u  %02u:%02u:%02u", date.day(), date.month(), date.year(), date.hour(), date.minute(), date.second());
+    sprintf(dateTimeBuffer,"%02u-%02u-%04u  %02u:%02u:%02u", date.day(), date.month(), date.year(), date.hour(), date.minute(), date.second());
 
     lcd.setCursor(0, 0);
-    lcd.print(buffer);
+    lcd.print(dateTimeBuffer);
 }
 
 void writeDHTReadingsToLCD()
@@ -45,21 +46,52 @@ void writeDHTReadingsToLCD()
     float temperature = getTemperature();
     float humidity = getHumidity();
 
-    char buffer[10];
+    int tempInt = (int)(temperature * 10);
+    int humInt = (int)(humidity * 10);
+
+    lcd.setCursor(0, 1);
 
     if (temperature == -1 || humidity == -1)
     {
-        sprintf(buffer, "DHT-ERROR");
+        lcd.print("DHT-ERROR");
     } else {
-        char temperatureBuffer[5];
-        char humidityBuffer[5];
-
-        dtostrf(temperature, 5, 1, temperatureBuffer);
-        dtostrf(humidity, 5, 1, humidityBuffer);
-        sprintf(buffer, "%s°C-%s%% ", temperatureBuffer, humidityBuffer);
+        char tempBuffer[16];
+        sprintf(tempBuffer, " T: %d.%d", tempInt / 10, abs(tempInt % 10));
+        lcd.print(tempBuffer);
+        
+        lcd.write(byte(0));
+        
+        char humBuffer[16];
+        sprintf(humBuffer, "C H: %d.%d%%", humInt / 10, abs(humInt % 10));
+        lcd.print(humBuffer);
     }
-    
-    lcd.setCursor(1, 0);
-    lcd.print(buffer);
 }
 
+void writePumpStatusToLCD() {
+    lcd.setCursor(0, 2);
+    int totalSeconds = getSecondsRemaingingAutoPumpTime();
+    int minutes = totalSeconds / 60;
+    int seconds = totalSeconds % 60;
+
+    if (isAutoPumping())
+    {
+        sprintf(pumpBuffer, "     Pump: %02d:%02d", minutes, seconds);
+        lcd.print(pumpBuffer);
+    }
+    else if (isPumping())
+    {
+        lcd.print("     Pump:   ON     ");
+    }
+    else
+    {
+        lcd.print("     Pump:   OFF    ");
+    }
+    
+
+    
+}
+
+void writeConnectionStatusToLCD() {
+    lcd.setCursor(0, 3);
+    lcd.print("Connected: YES");
+}

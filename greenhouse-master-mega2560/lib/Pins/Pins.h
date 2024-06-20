@@ -1,3 +1,5 @@
+#pragma once
+
 #define SPEAKER 2
 #define RELAY 3
 #define DHT_SENSOR 4

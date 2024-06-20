@@ -1,184 +1,239 @@
 #include <Buttons.h>
-#include <Ticker.h>
+#include <OneButton.h>
+#include <Pins.h>
+#include <SoundPlayer.h>
+#include <Pump.h>
 
-#define NUM_OF_BUTTONS 9
+#define DEFAULT_BTN_LONG_PRESS_MS 500
+#define RESET_BTN_LONG_PRESS_MS 3000
+#define PUMPING_TASK_DURATION_MINUTES 10
+#define CONTROLS_BUFFER_SIZE 10
 
-void initializeLEDs();
-void tickButtons();
+enum SoundSetting {
+    SOUND,
+    SILENT
+};
 
-Ticker buttonsTicker(tickButtons, 10);
+void leftWingOffTrigger();
+void leftWingOnTrigger();
+void rightWingOffTrigger();
+void rightWingOnTrigger();
+void pumpOffTrigger();
+void pumpOnTrigger();
+void valveTrigger();
+void autoPumpTrigger();
+void resetTrigger();
 
-void initializeButtons()
-{
-    initializeLEDs();
-    buttonsTicker.start();
-}
-
-void updateButtons() { buttonsTicker.update(); }
-
-void leftWingLeftTrigger();
-void leftWingRightTrigger();
-void rightWingLeftTrigger();
-void rightWingRightTrigger();
-void pumpLeftTrigger();
-void pumpRightTrigger();
-void pushBtnValveTrigger();
-void pushBtnAutoPumpTrigger();
-void pushBtnResetAutoTrigger();
+void disableAuto();
 
 struct Button {
     OneButton button;
-    bool isActive;
-    Button(const int pin, callbackFunction function, const bool activeLow = true, const bool pullupActive = true)
+    const int ledPin;
+    const Melody onSound;
+    const Melody offSound;
+    bool isToggled;
+
+    Button(const int pin, const int ledPin, callbackFunction function, const bool activeLow = true, const bool pullupActive = true, const int longPressTime = DEFAULT_BTN_LONG_PRESS_MS, const Melody offSound = buttonOff, const Melody onSound = buttonOn)
+        : ledPin(ledPin), onSound(onSound), offSound(offSound)
     {
         button = OneButton(pin, activeLow, pullupActive);
+        button.setPressTicks(longPressTime);
         button.attachLongPressStart(function);
-        isActive = false;
+        pinMode(ledPin, OUTPUT);
+        isToggled = false;
+    }
+
+    void toggle() {
+        isToggled ? toggleOff() : toggleOn();
+    }
+
+    void toggleOn(const SoundSetting soundSetting = SOUND) {
+        if (isToggled)
+        {
+            if (soundSetting == SOUND) playMelody(feedback);
+            return;
+            
+        }
+        
+        isToggled = true;
+        digitalWrite(ledPin, HIGH);
+        if (soundSetting == SOUND) playMelody(onSound);
+    }
+
+    void toggleOff(const SoundSetting soundSetting = SOUND) {
+        if (!isToggled)
+        {
+            if (soundSetting == SOUND) playMelody(feedback);
+            return;
+            
+        }
+
+        isToggled = false;
+        digitalWrite(ledPin, LOW);
+        if (soundSetting == SOUND) playMelody(offSound);
+    }
+
+    void tick() {
+        button.tick();
     }
 };
 
-enum Switch {
-    LEFT_WING_SW_LEFT,
-    LEFT_WING_SW_RIGHT,
-    RIGHT_WING_SW_LEFT,
-    RIGHT_WING_SW_RIGHT,
-    PUMP_SW_LEFT,
-    PUMP_SW_RIGHT,
-    BTN_VALVE,
-    BTN_AUTO_PUMP,
-    BTN_RESET_AUTO
+struct Switch {
+    Button left;
+    Button right;
+
+    Switch(const int offPin, const int offLedPin, const int onPin, const int onLedPin, callbackFunction offFunction, callbackFunction onFunction)
+        : left(offPin, offLedPin, offFunction), right(onPin, onLedPin, onFunction) {}
+
+    void switchOff(const SoundSetting soundSetting = SOUND) {
+        left.toggleOn(SILENT);
+        right.toggleOff(soundSetting);
+    }
+
+    void switchOn(const SoundSetting soundSetting = SOUND) {
+        left.toggleOff(SILENT);
+        right.toggleOn(soundSetting);
+    }
+    
+    bool isOn() {
+        return right.isToggled;
+    }
+
+    void tick() {
+        left.tick();
+        right.tick();
+    }
 };
 
-Button buttons[] = {
-    Button(LEFT_WING_SW_1, leftWingLeftTrigger),
-    Button(LEFT_WING_SW_2, leftWingRightTrigger),
-    Button(RIGHT_WING_SW_1, rightWingLeftTrigger),
-    Button(RIGHT_WING_SW_2, rightWingRightTrigger),
-    Button(PUMP_SW_1, pumpLeftTrigger),
-    Button(PUMP_SW_2, pumpRightTrigger),
-    Button(PUSH_BTN_VALVE, pushBtnValveTrigger, false, false),
-    Button(PUSH_BTN_AUTO_PUMP, pushBtnAutoPumpTrigger, false, false),
-    Button(PUSH_BTN_RESET_AUTO, pushBtnResetAutoTrigger)
-};
+Switch leftWingSwitch(LEFT_WING_SW_1, LEFT_WING_LEFT_LED, LEFT_WING_SW_2, LEFT_WING_RIGHT_LED, leftWingOffTrigger, leftWingOnTrigger);
+Switch rightWingSwitch(RIGHT_WING_SW_1, RIGHT_WING_LEFT_LED, RIGHT_WING_SW_2, RIGHT_WING_RIGHT_LED, rightWingOffTrigger, rightWingOnTrigger);
+Switch pumpSwitch(PUMP_SW_1, PUMP_OFF_LED, PUMP_SW_2, PUMP_ON_LED, pumpOffTrigger, pumpOnTrigger);
+Button valve(PUSH_BTN_VALVE, VALVE_ON_LED, valveTrigger, false, false);
+Button autoPump(PUSH_BTN_AUTO_PUMP, AUTO_PUMP_ON_LED, autoPumpTrigger, false, false);
+Button resetAuto(PUSH_BTN_RESET_AUTO, AUTO_ON_LED, resetTrigger, true, true, RESET_BTN_LONG_PRESS_MS, reset, reset);
 
-void initializeLEDs()
+char controlsBuffer[CONTROLS_BUFFER_SIZE];
+
+void initializeButtons()
 {
-    for (int i = LEFT_WING_LEFT_LED; i <= PUMP_ON_LED; i+=2) pinMode(i, OUTPUT);
+    resetAuto.toggleOn(SILENT);
+    leftWingSwitch.switchOff(SILENT);
+    rightWingSwitch.switchOff(SILENT);
+    pumpSwitch.switchOff(SILENT);
+    valve.toggleOff(SILENT);
+    autoPump.toggleOff(SILENT);
 }
 
-void tickButtons() {
-    for (int i = 0; i < NUM_OF_BUTTONS; i++) buttons[i].button.tick();
+void updateControls()
+{
+    leftWingSwitch.tick();
+    rightWingSwitch.tick();
+    pumpSwitch.tick();
+    valve.tick();
+    autoPump.tick();
+    resetAuto.tick();
 }
 
-void getButtonStatuses(char* buffer)
+void leftWingOffTrigger()
 {
-    for (int i = 0; i < NUM_OF_BUTTONS; i++)
-    {
-        buffer[i] = buttons[i].isActive ? 'H' : 'L';
-    }
+    leftWingSwitch.switchOff();
+    disableAuto();
 }
 
-void leftWingLeftTrigger()
+void leftWingOnTrigger()
 {
-    if (buttons[LEFT_WING_SW_RIGHT].isActive)
+    leftWingSwitch.switchOn();
+    disableAuto();
+}
+
+void rightWingOffTrigger()
+{
+    rightWingSwitch.switchOff();
+    disableAuto();
+}
+
+void rightWingOnTrigger()
+{
+    rightWingSwitch.switchOn();
+    disableAuto();
+}
+
+void pumpOffTrigger()
+{
+    pumpSwitch.switchOff();
+    autoPump.toggleOff(SILENT);
+    turnPumpOff();
+    turnAutoPumpOff();
+    disableAuto();
+}
+
+void pumpOnTrigger()
+{
+    pumpSwitch.switchOn();
+    autoPump.toggleOff(SILENT);
+    turnPumpOn();
+    turnAutoPumpOff();
+    disableAuto();
+}
+
+void valveTrigger()
+{
+    valve.toggle();
+    disableAuto();
+}
+
+void autoPumpTrigger()
+{
+    autoPump.toggle();
+    if (autoPump.isToggled)
     {
-        digitalWrite(LEFT_WING_RIGHT_LED, LOW);
-        buttons[LEFT_WING_SW_RIGHT].isActive = false;
+        pumpSwitch.switchOn(SILENT);
+        turnPumpOn();
+        turnAutoPumpOn();
     }
-    digitalWrite(LEFT_WING_LEFT_LED, HIGH);
-    buttons[LEFT_WING_SW_LEFT].isActive = true;
-    playSwitchOff();
-};
-
-void leftWingRightTrigger()
-{
-    if (buttons[LEFT_WING_SW_LEFT].isActive)
+    else
     {
-        digitalWrite(LEFT_WING_LEFT_LED, LOW);
-        buttons[LEFT_WING_SW_LEFT].isActive = false;
+        pumpSwitch.switchOff(SILENT);
+        turnPumpOff();
+        turnAutoPumpOff();
+
     }
-    digitalWrite(LEFT_WING_RIGHT_LED, HIGH);
-    buttons[LEFT_WING_SW_RIGHT].isActive = true;
-    playSwitchOn();
-};
+    disableAuto();
+}
 
-void rightWingLeftTrigger()
+void resetTrigger()
 {
-    if (buttons[RIGHT_WING_SW_RIGHT].isActive)
-    {
-        digitalWrite(RIGHT_WING_RIGHT_LED, LOW);
-        buttons[RIGHT_WING_SW_RIGHT].isActive = false;
-    }
-    digitalWrite(RIGHT_WING_LEFT_LED, HIGH);
-    buttons[RIGHT_WING_SW_LEFT].isActive = true;
-    playSwitchOff();
-};
+    resetAuto.toggleOn();
+    leftWingSwitch.switchOff(SILENT);
+    rightWingSwitch.switchOff(SILENT);
+    pumpSwitch.switchOff(SILENT);
+    valve.toggleOff(SILENT);
+    autoPump.toggleOff(SILENT);
+    turnPumpOff();
+    turnAutoPumpOff();
+}
 
-void rightWingRightTrigger()
+void disableAuto()
 {
-    if (buttons[RIGHT_WING_SW_LEFT].isActive)
-    {
-        digitalWrite(RIGHT_WING_LEFT_LED, LOW);
-        buttons[RIGHT_WING_SW_LEFT].isActive = false;
-    }
-    digitalWrite(RIGHT_WING_RIGHT_LED, HIGH);
-    buttons[RIGHT_WING_SW_RIGHT].isActive = true;
-    playSwitchOn();
-};
+    resetAuto.toggleOff(SILENT);
+}
 
-void pumpLeftTrigger()
+void finishAutoPump()
 {
-    if (buttons[PUMP_SW_RIGHT].isActive)
-    {
-        digitalWrite(PUMP_ON_LED, LOW);
-        buttons[PUMP_SW_RIGHT].isActive = false;
-    }
-    digitalWrite(PUMP_OFF_LED, HIGH);
-    buttons[PUMP_SW_LEFT].isActive = true;
-    playSwitchOff();
-};
+    pumpOffTrigger();
+}
 
-void pumpRightTrigger()
+char* getButtonStatuses()
 {
-    if (buttons[PUMP_SW_LEFT].isActive)
-    {
-        digitalWrite(PUMP_OFF_LED, LOW);
-        buttons[PUMP_SW_LEFT].isActive = false;
-    }
-    digitalWrite(PUMP_ON_LED, HIGH);
-    buttons[PUMP_SW_RIGHT].isActive = true;
-    playSwitchOn();
-};
-
-void pushBtnAutoPumpTrigger()
-{
-    if(buttons[BTN_AUTO_PUMP].isActive) {
-        digitalWrite(AUTO_PUMP_ON_LED, LOW);
-        playButtonOff();
-    } else {
-        digitalWrite(AUTO_PUMP_ON_LED, HIGH);
-        playButtonOn();
-    }
-
-    buttons[BTN_AUTO_PUMP].isActive = !buttons[BTN_AUTO_PUMP].isActive;
-};
-
-void pushBtnValveTrigger()
-{
-    if(buttons[BTN_VALVE].isActive) {
-        digitalWrite(VALVE_ON_LED, LOW);
-        playButtonOff();
-    } else {
-        digitalWrite(VALVE_ON_LED, HIGH);
-        playButtonOn();
-    }
-
-    buttons[BTN_VALVE].isActive = !buttons[BTN_VALVE].isActive;
-};
-
-void pushBtnResetAutoTrigger()
-{
-    buttons[BTN_RESET_AUTO].isActive = true;
-    digitalWrite(AUTO_ON_LED, HIGH);
-    playReset();
-};
+    controlsBuffer[0] = leftWingSwitch.left.isToggled ? 'H' : 'L';
+    controlsBuffer[1] = leftWingSwitch.right.isToggled ? 'H' : 'L';
+    controlsBuffer[2] = rightWingSwitch.left.isToggled ? 'H' : 'L';
+    controlsBuffer[3] = rightWingSwitch.right.isToggled ? 'H' : 'L';
+    controlsBuffer[4] = pumpSwitch.left.isToggled ? 'H' : 'L';
+    controlsBuffer[5] = pumpSwitch.right.isToggled ? 'H' : 'L';
+    controlsBuffer[6] = valve.isToggled ? 'H' : 'L';
+    controlsBuffer[7] = autoPump.isToggled ? 'H' : 'L';
+    controlsBuffer[8] = resetAuto.isToggled ? 'H' : 'L';
+    controlsBuffer[9] = '\0';
+    return controlsBuffer;
+}

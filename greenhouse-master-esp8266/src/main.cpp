@@ -1,14 +1,15 @@
 #include <Arduino.h>
-#include <protocol.h>
+#include <Protocol.h>
 
 #define BAUDRATE 115200
 
 void setup() {
 	Serial.begin(BAUDRATE);
+	initializeCommunicationProtocol();
 	delay(1000);
 }
 
 void loop() {
-	loopCommunicationProtocol();
-	delay(10);
+    updateCommunication();
+	delay(500);
 }

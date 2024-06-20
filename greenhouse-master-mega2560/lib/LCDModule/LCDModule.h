@@ -1,6 +1,7 @@
-#include <Arduino.h>
-#include <RTClib.h>
+#pragma once
 
 void initializeLCD();
-
-void updateLCD();
+void writeDateAndTimeToLCD();
+void writeDHTReadingsToLCD();
+void writePumpStatusToLCD();
+void writeConnectionStatusToLCD();

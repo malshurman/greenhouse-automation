@@ -2,7 +2,7 @@
 #include <Pins.h>
 #include <DHT.h>
 
-DHT dht(DHT_SENSOR, DHT22);
+DHT dht(DHT_SENSOR, DHT21);
 
 void initializeDHT()
 {

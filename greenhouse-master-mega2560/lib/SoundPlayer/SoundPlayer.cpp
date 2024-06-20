@@ -1,7 +1,5 @@
+#include <Arduino.h>
 #include <SoundPlayer.h>
-#include <Sounds.h>
-
-void playMelody(const Melody melody);
 
 void playTheLick()
 {

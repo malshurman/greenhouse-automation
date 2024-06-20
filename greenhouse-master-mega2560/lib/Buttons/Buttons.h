@@ -1,9 +1,8 @@
-#include <OneButton.h>
-#include <Pins.h>
-#include <SoundPlayer.h>
+#pragma once
+
+#include <RTCModule.h>
 
 void initializeButtons();
-
-void updateButtons();
-
-void getButtonStatuses(char* buffer);
+void updateControls();
+void finishAutoPump();
+char* getButtonStatuses();

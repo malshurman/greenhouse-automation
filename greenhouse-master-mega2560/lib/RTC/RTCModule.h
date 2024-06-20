@@ -1,4 +1,5 @@
-#include <Arduino.h>
+#pragma once
+
 #include <RTClib.h>
 
 void initializeRTC();

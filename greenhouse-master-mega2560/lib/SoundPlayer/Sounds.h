@@ -1,3 +1,5 @@
+#pragma once
+
 #define NOTE_B0  31
 #define NOTE_C1  33
 #define NOTE_CS1 35
@@ -98,6 +100,7 @@ struct Melody {
 const Melody theLick = { {NOTE_D4,8, NOTE_E4,8, NOTE_F4,8, NOTE_G4,8, NOTE_E4,4, NOTE_C4,8, NOTE_D4,2}, 178, 7};
 const Melody switchOn = { {NOTE_G3,16, NOTE_D4,8, REST,16, NOTE_G6,8}, 200, 4};
 const Melody switchOff = { {NOTE_G6,16, NOTE_D4,8, REST,16, NOTE_G3,8}, 200, 4};
-const Melody buttonOn = { {NOTE_G2,16, NOTE_E4,8}, 200, 2};
-const Melody buttonOff = { {NOTE_E4,8, NOTE_G2,16}, 200, 2};
+const Melody buttonOn = { {NOTE_E2,12, NOTE_G2,8}, 200, 2};
+const Melody buttonOff = { {NOTE_G2,8, NOTE_E2,16}, 200, 2};
+const Melody feedback = { {NOTE_E2,8}, 200, 1};
 const Melody reset = { {NOTE_AS1,16, NOTE_AS1,8}, 110, 2};
