@@ -1,95 +1,122 @@
-#include <Arduino.h>
 #include <Pump.h>
 #include <Pins.h>
-#include <RTCModule.h>
-#include <Buttons.h>
+#include <LCDModule.h>
+#include <TaskManager.h>
+#include <Protocol.h>
 
-#define AUTO_PUMP_DURATION_SECONDS 10 * 60
-#define DEFAULT_UNIX_TIME 1577880000
+#define PUMP_READINGS_REFRESH_RATE 250
+#define DEFAULT_AUTO_PUMP_DURATION_MINUTES 10
 
-struct PumpingTask
+static char pumpStatusBuffer[21];
+
+Pump& Pump::getInstance()
 {
-    bool isActive;
-    uint32_t startTimeUnix;
-    uint32_t endTimeUnix;
-
-    PumpingTask()
-        : isActive(false), startTimeUnix(DEFAULT_UNIX_TIME), endTimeUnix(DEFAULT_UNIX_TIME) {}
-};
-
-bool isPumpOn;
-PumpingTask autoPumpTask;
-
-void initializePump()
-{
-    pinMode(RELAY, OUTPUT);
-    digitalWrite(RELAY, LOW);
-    isPumpOn = false;
-    autoPumpTask = PumpingTask();
+    static Pump instance;
+    return instance;
 }
 
-void updatePump()
+static void writePumpStatusToLCDTask()
 {
-    if (autoPumpTask.isActive)
-    {
-        if (getCurrentDateTime().unixtime() >= autoPumpTask.endTimeUnix)
-        {
-            isPumpOn = false;
-            autoPumpTask.isActive = false;
-            finishAutoPump();
+    Pump::getInstance().writePumpStatusToLCD();
+}
 
-        }
+static void updateAutoPump()
+{
+    if (!Pump::getInstance().isAutoPumpOn()) return;
+    if (Pump::getInstance().getSecondsRemaingingAutoPumpTime() <= 0) Pump::getInstance().autoPumpToggle();
+}
+
+Pump::Pump()
+    : pumpSwitch(PUMP_SW_1, PUMP_OFF_LED, PUMP_SW_2, PUMP_ON_LED, pumpOff, "pumpOff", pumpOn, "pumpOn"),
+      autoPumpButton(PUSH_BTN_AUTO_PUMP, AUTO_PUMP_ON_LED, autoPumpToggle, "autoPumpToggle", false, false),
+      autoPumpStartTime(DateTime(SECONDS_FROM_1970_TO_2000)), autoPumpEndTime(DateTime(SECONDS_FROM_1970_TO_2000)) {
+        pumpSwitch.switchOff(SILENT);
+        TaskManager::getInstance().createTask(PUMP_READINGS_REFRESH_RATE, writePumpStatusToLCDTask);
+        TaskManager::getInstance().createTask(PUMP_READINGS_REFRESH_RATE, updateAutoPump);
     }
-    digitalWrite(RELAY, isPumpOn ? HIGH : LOW);
+
+void Pump::pumpOn()
+{
+    getInstance().pumpSwitch.switchOn();
+    getInstance().autoPumpButton.toggleOff(SILENT);
 }
 
-void turnPumpOn()
+void Pump::pumpOff()
 {
-    digitalWrite(RELAY, HIGH);
-    isPumpOn = true;
+    getInstance().pumpSwitch.switchOff();
+    getInstance().autoPumpButton.toggleOff(SILENT);
 }
 
-void turnPumpOff()
+void Pump::autoPumpToggle()
 {
-    digitalWrite(RELAY, LOW);
-    isPumpOn = false;
+    getInstance().autoPumpButton.toggle();
+    if (getInstance().autoPumpButton.isToggled()) {
+        getInstance().setAutoPumpTimer();
+        getInstance().pumpSwitch.switchOn(SILENT);
+    } else {
+        getInstance().pumpSwitch.switchOff(SILENT);
+    }
 }
 
-void turnAutoPumpOn()
+bool Pump::isPumpOn()
 {
-    turnPumpOn();
-    autoPumpTask.startTimeUnix = getCurrentDateTime().unixtime();
-    autoPumpTask.endTimeUnix = autoPumpTask.startTimeUnix + AUTO_PUMP_DURATION_SECONDS;
-    autoPumpTask.isActive = true;
+    return pumpSwitch.isOn();
 }
 
-void turnAutoPumpOff()
+bool Pump::isAutoPumpOn()
 {
-    autoPumpTask.isActive = false;
+    return autoPumpButton.isToggled();
 }
 
-bool isPumping()
+int Pump::getSecondsRemaingingAutoPumpTime()
 {
-    return isPumpOn;
+    if (!autoPumpButton.isToggled()) return 0;
+    DateTime now = RTCModule::getInstance().getCurrentDateTime();
+    return (autoPumpEndTime - now).totalseconds();
 }
 
-bool isAutoPumping()
+void Pump::writePumpStatusToLCD()
 {
-    return autoPumpTask.isActive;
+    int totalSeconds = getSecondsRemaingingAutoPumpTime();
+    int minutes = totalSeconds / 60;
+    int seconds = totalSeconds % 60;
+
+    if (isAutoPumpOn())
+    {
+        sprintf(pumpStatusBuffer, "     Pump: %02d:%02d", minutes, seconds);
+    }
+    else if (isPumpOn())
+    {
+        sprintf(pumpStatusBuffer, "     Pump:   ON    ");
+    }
+    else
+    {
+        sprintf(pumpStatusBuffer, "     Pump:   OFF   ");
+    }
+
+    LCDModule::getInstance().writeToLCD(0, 2, pumpStatusBuffer);
 }
 
-int getSecondsRemaingingAutoPumpTime()
+void Pump::setAutoPumpTimer()
 {
-    if (!autoPumpTask.isActive) return 0;
-    return autoPumpTask.endTimeUnix - getCurrentDateTime().unixtime();
+    autoPumpStartTime = RTCModule::getInstance().getCurrentDateTime();
+    autoPumpEndTime = autoPumpStartTime + TimeSpan(Protocol::getInstance().getAutoPumpDurationSeconds());
 }
 
-uint32_t getAutoPumpStartTime()
+uint32_t Pump::getAutoPumpStartTime()
 {
-    return autoPumpTask.startTimeUnix;
+    return autoPumpStartTime.unixtime();
 }
 
-uint32_t getAutoPumpEndTime()
+uint32_t Pump::getAutoPumpEndTime()
 {
-    return autoPumpTask.endTimeUnix;
+    return autoPumpEndTime.unixtime();
+}
+
+void Pump::reset()
+{
+    pumpSwitch.switchOff(SILENT);
+    autoPumpButton.toggleOff(SILENT);
+    autoPumpStartTime = DateTime(SECONDS_FROM_1970_TO_2000);
+    autoPumpEndTime = DateTime(SECONDS_FROM_1970_TO_2000);
 }

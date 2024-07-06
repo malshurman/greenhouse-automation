@@ -1,7 +1,20 @@
 #pragma once
 
-void initializeDHT();
+#include <DHT.h>
 
-float getTemperature();
+class DHTModule {
+public:
+    DHTModule(const DHTModule&) = delete;
+    DHTModule& operator=(const DHTModule&) = delete;
 
-float getHumidity();
+    static DHTModule& getInstance();
+
+    static float getTemperature();
+    static float getHumidity();
+
+    void writeDHTReadingsToLCD();
+    char* getDHTBuffer();
+private:
+    DHTModule();
+    DHT dht;
+};
