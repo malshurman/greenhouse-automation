@@ -50,5 +50,5 @@ void Protocol::writeConnectionStatusToLCD()
 
     sprintf(lcdBuffer, "WiFi: %3ld%% Soc: %s", 100 - abs(wifiSignalStrength), socketConnected ? " ON" : "OFF");
 
-    LCDModule::getInstance().writeToLCD(0, 3, lcdBuffer);
+    LCDModule::getInstance().writeToLCD(0, 2, lcdBuffer);
 }
