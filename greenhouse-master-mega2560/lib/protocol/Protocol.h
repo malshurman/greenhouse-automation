@@ -1,5 +1,7 @@
 #pragma once
 
+#include <States.h>
+
 class Protocol {
 public:
     Protocol(const Protocol&) = delete;
@@ -7,9 +9,11 @@ public:
 
     static Protocol& getInstance();
 
+    void writeConnectionStatusToLCD();
     void loopCommunicationProtocol();
-    int getAutoPumpDurationSeconds();
-    void writeDataToLCD();
+    int getAutoPumpDurationMinutes();
 private:
     Protocol();
+    ~Protocol();
+    Context* context;
 };

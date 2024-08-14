@@ -5,7 +5,6 @@
 #include <Protocol.h>
 
 #define PUMP_READINGS_REFRESH_RATE 250
-#define DEFAULT_AUTO_PUMP_DURATION_MINUTES 10
 
 static char pumpStatusBuffer[21];
 
@@ -20,7 +19,7 @@ static void writePumpStatusToLCDTask()
     Pump::getInstance().writePumpStatusToLCD();
 }
 
-static void updateAutoPump()
+static void updateAutoPumpTask()
 {
     if (!Pump::getInstance().isAutoPumpOn()) return;
     if (Pump::getInstance().getSecondsRemaingingAutoPumpTime() <= 0) Pump::getInstance().autoPumpToggle();
@@ -32,7 +31,7 @@ Pump::Pump()
       autoPumpStartTime(DateTime(SECONDS_FROM_1970_TO_2000)), autoPumpEndTime(DateTime(SECONDS_FROM_1970_TO_2000)) {
         pumpSwitch.switchOff(SILENT);
         TaskManager::getInstance().createTask(PUMP_READINGS_REFRESH_RATE, writePumpStatusToLCDTask);
-        TaskManager::getInstance().createTask(PUMP_READINGS_REFRESH_RATE, updateAutoPump);
+        TaskManager::getInstance().createTask(PUMP_READINGS_REFRESH_RATE, updateAutoPumpTask);
     }
 
 void Pump::pumpOn()
@@ -94,13 +93,13 @@ void Pump::writePumpStatusToLCD()
         sprintf(pumpStatusBuffer, "     Pump:   OFF   ");
     }
 
-    LCDModule::getInstance().writeToLCD(0, 2, pumpStatusBuffer);
+    LCDModule::getInstance().writeToLCD(0, 3, pumpStatusBuffer);
 }
 
 void Pump::setAutoPumpTimer()
 {
     autoPumpStartTime = RTCModule::getInstance().getCurrentDateTime();
-    autoPumpEndTime = autoPumpStartTime + TimeSpan(Protocol::getInstance().getAutoPumpDurationSeconds());
+    autoPumpEndTime = autoPumpStartTime + TimeSpan(0, 0, Protocol::getInstance().getAutoPumpDurationMinutes(), 0);
 }
 
 uint32_t Pump::getAutoPumpStartTime()

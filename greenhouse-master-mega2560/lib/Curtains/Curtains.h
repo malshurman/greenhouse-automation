@@ -19,6 +19,9 @@ public:
     static void rightCurtainUp();
     static void rightCurtainDown();
 
+    bool isLeftCurtainUp();
+    bool isRightCurtainUp();
+
     void reset();
 
 private:

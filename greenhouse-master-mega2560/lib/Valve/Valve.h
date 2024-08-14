@@ -10,6 +10,8 @@ public:
     static Valve& getInstance();
     static void toggle();
 
+    bool isOpen();
+
     void reset();
 private:
     Valve();

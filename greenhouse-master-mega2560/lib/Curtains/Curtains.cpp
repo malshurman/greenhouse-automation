@@ -33,3 +33,11 @@ void Curtains::reset() {
     leftCurtainSwitch.switchOff(SILENT);
     rightCurtainSwitch.switchOff(SILENT);
 }
+
+bool Curtains::isLeftCurtainUp() {
+    return leftCurtainSwitch.isOn();
+}
+
+bool Curtains::isRightCurtainUp() {
+    return rightCurtainSwitch.isOn();
+}

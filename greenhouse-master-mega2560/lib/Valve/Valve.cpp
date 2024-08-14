@@ -17,3 +17,7 @@ void Valve::toggle() {
 void Valve::reset() {
     valveButton.toggleOff(SILENT);
 }
+
+bool Valve::isOpen() {
+    return valveButton.isToggled();
+}
